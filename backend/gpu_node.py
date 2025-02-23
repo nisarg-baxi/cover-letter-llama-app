@@ -17,11 +17,9 @@ try:
         torch_dtype=torch.float16,
         device_map="cuda:0"
     )
-    embedding_layer = model.model.embed_tokens.to("cuda")  # Embedding layer
     total_layers = len(model.model.layers)  # Should be 32
     split_point = total_layers // 2  # 16
-    gpu_layers = torch.nn.Sequential(*model.model.layers[:split_point]).to("cuda")
-    print(f"Loaded embedding layer and {split_point} layers on GPU")
+    print(f"Loaded model with {total_layers} layers, split at {split_point}")
 except Exception as e:
     print(f"Error loading model: {e}")
     exit(1)
@@ -33,20 +31,21 @@ print(f"RAM Available: {psutil.virtual_memory().available / 1024**3:.2f} GB")
 def gpu_forward():
     try:
         data = request.get_json()
-        print("Received input_ids:", data['input_ids'])
         input_ids = torch.tensor(data['input_ids']).to("cuda")
-        print("Input shape:", input_ids.shape)
+        attention_mask = torch.tensor(data.get('attention_mask', [[1] * input_ids.shape[1]])).to("cuda")
+        print("Input_ids shape:", input_ids.shape)
+        print("Attention_mask shape:", attention_mask.shape)
         
         with torch.no_grad():
-            # Step 1: Convert input_ids to embeddings
-            embeddings = embedding_layer(input_ids)  # Shape: [1, seq_len, 4096]
-            print("Embeddings shape:", embeddings.shape)
-            # Step 2: Pass through GPU layers
-            activations = gpu_layers(embeddings)  # Shape: [1, seq_len, 4096]
-            print(f"Activations shape: {activations.shape}")
-        print(f"GPU VRAM Used during inference: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
+            # Forward pass up to split_point
+            hidden_states = model.model.embed_tokens(input_ids)  # Shape: [1, seq_len, 4096]
+            print("Embeddings shape:", hidden_states.shape)
+            for i in range(split_point):
+                hidden_states = model.model.layers[i](hidden_states, attention_mask=attention_mask)[0]
+            print(f"Activations shape after {split_point} layers: {hidden_states.shape}")
         
-        return jsonify({"activations": activations.cpu().tolist()})
+        print(f"GPU VRAM Used during inference: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
+        return jsonify({"activations": hidden_states.cpu().tolist()})
     except Exception as e:
         print(f"Error in gpu_forward: {e}")
         return jsonify({"error": str(e)}), 500
