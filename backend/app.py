@@ -2,14 +2,24 @@ from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+print(f"Total RAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB" if torch.cuda.is_available() else "No GPU")
+import psutil
+print(f"Available RAM: {psutil.virtual_memory().available / 1024**3:.2f} GB")
 import time
 import os
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 print("Loading model from ... mistralai/Mistral-7B-v0.1")
+print(f"CUDA Available: {torch.cuda.is_available()}")
+if torch.cuda.is_available():
+    print(f"Device: {torch.cuda.get_device_name(0)}")
+    print(f"CUDA Version: {torch.version.cuda}")
+else:
+    print("CUDA not detected by PyTorch")
 model_id = "mistralai/Mistral-7B-v0.1"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
+print("Loading tokenizer..")
 model = AutoModelForCausalLM.from_pretrained(model_id)
 print("NM: Model loaded")
 
