@@ -34,8 +34,8 @@ def generate_cover_letter():
 
     # Step 1: Offload to Windows GPU
     response = requests.post(GPU_NODE_URL, json={"input_ids": input_ids.tolist()})
+    print("Windows response:", response.text)  # Debug output
     gpu_activations = torch.tensor(response.json()['activations']).to("cpu")
-
     # Step 2: Process on Mac CPU
     with torch.no_grad():
         cpu_outputs = cpu_layers(gpu_activations)

@@ -10,13 +10,12 @@ model_id = "SweatyCrayfish/llama-3-8b-quantized"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 try:
-    # Load model with 4-bit quantization
     print("Loading model with 4-bit quantization...")
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
-        load_in_4bit=True,  # Quantize to 4-bit
+        load_in_4bit=True,
         torch_dtype=torch.float16,
-        device_map="cuda:0"  # Force GPU loading
+        device_map="cuda:0"
     )
     total_layers = len(model.model.layers)  # Should be 32
     split_point = total_layers // 2  # 16
@@ -26,7 +25,6 @@ except Exception as e:
     print(f"Error loading model: {e}")
     exit(1)
 
-# Memory usage check
 print(f"VRAM Used: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
 print(f"RAM Available: {psutil.virtual_memory().available / 1024**3:.2f} GB")
 
@@ -34,12 +32,18 @@ print(f"RAM Available: {psutil.virtual_memory().available / 1024**3:.2f} GB")
 def gpu_forward():
     try:
         data = request.get_json()
+        print("Received input_ids:", data['input_ids'])  # Debug input
         input_ids = torch.tensor(data['input_ids']).to("cuda")
+        print("Input shape:", input_ids.shape)  # Debug shape
+        
         with torch.no_grad():
             activations = gpu_layers(input_ids)
+        print(f"Activations shape: {activations.shape}")  # Debug output shape
         print(f"GPU VRAM Used during inference: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
+        
         return jsonify({"activations": activations.cpu().tolist()})
     except Exception as e:
+        print(f"Error in gpu_forward: {e}")  # Log error on Windows
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
