@@ -23,7 +23,6 @@ print(f"Loading model: {model_id}")
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 model = AutoModelForCausalLM.from_pretrained(
     model_id,
-    device_map="auto"  # Auto-offload to CPU if VRAM is tight
 )
 print("Model loaded")
 
