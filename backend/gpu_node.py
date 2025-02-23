@@ -22,7 +22,7 @@ try:
         torch_dtype=torch.float16,
         device_map="cuda:0"
     )
-    total_layers = len(model.model.layers)  # Should be 32
+    total_layers = len(model.model.layers)  # 32
     split_point = total_layers // 2  # 16
     print(f"Loaded model with {total_layers} layers, split at {split_point}")
 except Exception as e:
@@ -38,18 +38,19 @@ def gpu_forward():
         data = request.get_json()
         input_ids = torch.tensor(data['input_ids']).to("cuda")
         attention_mask = torch.tensor(data.get('attention_mask', [[1] * input_ids.shape[1]])).to("cuda")
+        position_ids = torch.tensor(data.get('position_ids', torch.arange(input_ids.shape[1]).unsqueeze(0).tolist())).to("cuda")
         print("Input_ids shape:", input_ids.shape)
         print("Attention_mask shape:", attention_mask.shape)
+        print("Position_ids shape:", position_ids.shape)
         
         with torch.no_grad():
-            # Use the model's forward pass up to split_point
             outputs = model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                output_hidden_states=True,  # Get all hidden states
+                position_ids=position_ids,  # Use provided position_ids
+                output_hidden_states=True,
                 return_dict=True
             )
-            # Extract hidden state after split_point layers (index split_point + 1 because 0 is embeddings)
             hidden_states = outputs.hidden_states[split_point + 1]
             print(f"Activations shape after {split_point} layers: {hidden_states.shape}")
         
