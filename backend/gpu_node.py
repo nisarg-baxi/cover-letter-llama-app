@@ -47,10 +47,10 @@ def gpu_forward():
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
-                max_new_tokens=50,  # Adjust for desired length
-                do_sample=True,     # Enable sampling for variety
-                temperature=0.7,    # Control randomness
-                top_p=0.95          # Nucleus sampling
+                max_new_tokens=50,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.95
             )
             print(f"Generated sequence shape: {outputs.shape}")
         
