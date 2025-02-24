@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from bitsandbytes import BitsAndBytesConfig
 import psutil
 
 app = Flask(__name__)
@@ -12,13 +11,14 @@ tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 try:
     print("Loading Mistral-7B with 4-bit quantization...")
-    quantization_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.float16
-    )
+    # quantization_config = BitsAndBytesConfig(
+    #     load_in_4bit=True,
+    #     bnb_4bit_compute_dtype=torch.float16
+    # )
     model = AutoModelForCausalLM.from_pretrained(
         model_id,
-        quantization_config=quantization_config,
+        load_in_4bit=True,
+        bnb_4bit_compute_dtype=torch.float16,
         torch_dtype=torch.float16,
         device_map="cuda:0"
     )
@@ -42,15 +42,17 @@ def gpu_forward():
         print("Position_ids shape:", position_ids.shape)
         
         with torch.no_grad():
-            # Generate sequence
+            # Generate sequence with refined parameters
             outputs = model.generate(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 position_ids=position_ids,
-                max_new_tokens=50,
+                max_new_tokens=100,  # Longer output for full responses
                 do_sample=True,
-                temperature=0.7,
-                top_p=0.95
+                temperature=0.6,     # Lower for less randomness
+                top_p=0.9,          # Slightly tighter sampling
+                top_k=40,           # Add top-k sampling for coherence
+                repetition_penalty=1.2  # Penalize repetition
             )
             print(f"Generated sequence shape: {outputs.shape}")
         
