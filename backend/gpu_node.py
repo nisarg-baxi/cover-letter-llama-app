@@ -23,7 +23,7 @@ try:
         device_map="cuda:0"
     )
     total_layers = len(model.model.layers)  # 32
-    split_point = total_layers // 2  # 16
+    split_point = total_layers - 1  # 31, leave last layer for Mac
     print(f"Loaded model with {total_layers} layers, split at {split_point}")
 except Exception as e:
     print(f"Error loading model: {e}")
@@ -47,11 +47,11 @@ def gpu_forward():
             outputs = model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                position_ids=position_ids,  # Use provided position_ids
+                position_ids=position_ids,
                 output_hidden_states=True,
                 return_dict=True
             )
-            hidden_states = outputs.hidden_states[split_point + 1]
+            hidden_states = outputs.hidden_states[split_point + 1]  # After layer 31
             print(f"Activations shape after {split_point} layers: {hidden_states.shape}")
         
         print(f"GPU VRAM Used during inference: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")
