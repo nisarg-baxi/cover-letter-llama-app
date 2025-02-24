@@ -7,11 +7,11 @@ import psutil
 app = Flask(__name__)
 
 # Model setup
-model_id = "SweatyCrayfish/llama-3-8b-quantized"
+model_id = "mistralai/Mistral-7B-v0.1"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 try:
-    print("Loading model with 4-bit quantization...")
+    print("Loading Mistral-7B with 4-bit quantization...")
     quantization_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_compute_dtype=torch.float16
