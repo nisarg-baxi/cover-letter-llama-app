@@ -5,3 +5,4 @@ torch
 psutil
 grpcio
 grpcio-tools
+bitsandbytes

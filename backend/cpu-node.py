@@ -1,6 +1,6 @@
 from flask import Flask, request, Response, jsonify
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
 import psutil
 import time
 from flask_cors import CORS
@@ -12,26 +12,52 @@ import llm_pb2_grpc
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 
+# GPU node configuration - Update this to your Mac M4's IP address
+GPU_NODE_ADDRESS = "192.168.1.100:50051"  # Replace with your Mac M4's actual IP address
+
 # Model setup
 model_id = "mistralai/Mistral-7B-v0.1"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
+config = AutoConfig.from_pretrained(model_id)
+
+# Load only layers 0-20 on CPU using device_map for 65-35 distribution
+layer_start = 0   # Start from layer 0 (35% split)
+layer_end = 21    # End at layer 20 (Mac handles first 21 layers)
+
+# Create a custom device map that only loads specific layers to CPU
+device_map = {}
+device_map["model.embed_tokens"] = "cpu"  # Keep embedding on CPU
+device_map["model.norm"] = "cpu"  # Keep norm on CPU
+device_map["lm_head"] = "cpu"  # Keep lm_head on CPU
+
+# Map only layers 0-20 to CPU (35% of layers)
+for i in range(layer_start, layer_end):
+    device_map[f"model.layers.{i}"] = "cpu"
+
+# Map all other layers to CPU (they won't be loaded)
+for i in range(32):  # Mistral-7B has 32 layers
+    if i < layer_start or i >= layer_end:
+        device_map[f"model.layers.{i}"] = "cpu"
+
+print(f"Loading layers {layer_start} to {layer_end-1} on CPU (35% distribution)...")
+
 full_model = AutoModelForCausalLM.from_pretrained(
     model_id,
+    device_map=device_map,
     torch_dtype=torch.float16,
-    device_map="cpu"
+    low_cpu_mem_usage=True
 )
-total_layers = len(full_model.model.layers)
-split_point = total_layers // 2
-embedding = full_model.model.embed_tokens.to("cpu")
-first_layers = torch.nn.ModuleList(full_model.model.layers[:split_point]).to("cpu")
-config = full_model.config
+
+# Extract only the layers we need
+embedding = full_model.model.embed_tokens
+first_layers = torch.nn.ModuleList()
+for i in range(layer_start, layer_end):
+    first_layers.append(full_model.model.layers[i])
+
 hidden_dim = embedding.embedding_dim
-print(f"Loaded embedding and layers 0 to {split_point-1} on CPU")
+print(f"Loaded embedding and layers {layer_start} to {layer_end-1} on CPU")
 
 print(f"Available RAM: {psutil.virtual_memory().available / 1024**3:.2f} GB")
-
-# GPU node configuration
-GPU_NODE_ADDRESS = "10.0.0.196:50051"  # Replace with your Windows laptop's IP and gRPC port
 
 def try_gpu_forward(input_ids, attention_mask, position_ids):
     try:

@@ -10,7 +10,8 @@ import os
 class LLMServiceServicer(llm_pb2_grpc.LLMServiceServicer):
     def __init__(self):
         try:
-            self.model_id = "mistralai/Mistral-7B-v0.1"
+            # Use a smaller model for testing
+            self.model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"  # Much smaller than Mistral-7B
             print("Loading model config and tokenizer on GPU node...")
             
             # Check CUDA availability
@@ -28,10 +29,9 @@ class LLMServiceServicer(llm_pb2_grpc.LLMServiceServicer):
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
             self.config = AutoConfig.from_pretrained(self.model_id)
             
-            # Load only specific layers (21-32) using device_map for 65-35 distribution
-            # This loads only the layers we need, not the entire model
-            layer_start = 21  # Start from layer 21 (65% split)
-            layer_end = 32    # End at layer 32 (Mistral-7B has 32 layers)
+            # TinyLlama has 22 layers, let's load layers 11-21 (last half)
+            layer_start = 11
+            layer_end = 22
             
             # Create a custom device map that only loads specific layers to GPU
             device_map = {}
@@ -39,16 +39,16 @@ class LLMServiceServicer(llm_pb2_grpc.LLMServiceServicer):
             device_map["model.norm"] = "cpu"  # Keep norm on CPU
             device_map["lm_head"] = "cuda:0"  # Keep lm_head on GPU
             
-            # Map only layers 21-32 to GPU (65% of layers)
+            # Map only layers 11-21 to GPU
             for i in range(layer_start, layer_end):
                 device_map[f"model.layers.{i}"] = "cuda:0"
             
             # Map all other layers to CPU (they won't be loaded)
-            for i in range(32):  # Mistral-7B has 32 layers
+            for i in range(22):  # TinyLlama has 22 layers
                 if i < layer_start or i >= layer_end:
                     device_map[f"model.layers.{i}"] = "cpu"
             
-            print(f"Loading layers {layer_start} to {layer_end-1} on GPU (65% distribution)...")
+            print(f"Loading layers {layer_start} to {layer_end-1} on GPU...")
             
             # Load model with custom device map
             full_model = AutoModelForCausalLM.from_pretrained(
@@ -131,4 +131,4 @@ def serve():
     server.wait_for_termination()
 
 if __name__ == "__main__":
-    serve()
+    serve() 
