@@ -1,66 +1,75 @@
 from flask import Flask, request, Response, jsonify
-from flask_cors import CORS
-from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import psutil
 import time
-import os
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=["http://localhost:5173", "http://10.0.0.239:5173"])
 
-# Check resources
-print(f"CUDA Available: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    print(f"Device: {torch.cuda.get_device_name(0)}")
-    print(f"Total VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
-print(f"Available RAM: {psutil.virtual_memory().available / 1024**3:.2f} GB")
-
-# Model setup for Llama 3 8B Quantized
-model_id = "SweatyCrayfish/llama-3-8b-quantized"  # Updated model ID
-
-print(f"Loading model: {model_id}")
+# Model setup
+model_id = "google/gemma-2-2b-it"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
-model = AutoModelForCausalLM.from_pretrained(
-    model_id,
-)
-print("Model loaded")
+eos_token_id = tokenizer.eos_token_id
 
-@app.route('/generate', methods=['POST', 'GET'])
+try:
+    print("Loading Gemma-2-2B-IT in FP16 on CPU...")
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id,
+        torch_dtype=torch.float16,
+        device_map="cpu"
+    )
+    print(f"Loaded model with {len(model.model.layers)} layers in FP16")
+except Exception as e:
+    print(f"Error loading model: {e}")
+    exit(1)
+
+print(f"EOS token ID: {eos_token_id}")
+print(f"RAM Available: {psutil.virtual_memory().available / 1024**3:.2f} GB")
+
+@app.route('/generate', methods=['POST'])
 def generate_cover_letter():
-    def generate(job_description=None):
-        if job_description:
-            # Tailored prompt for cover letter
-            prompt = f"{job_description}"
-            inputs = tokenizer(prompt, return_tensors="pt").to("cuda" if torch.cuda.is_available() else "cpu")
+    start_time = time.time()
+    data = request.get_json()
+    job_description = data.get('job_description', '') if data else ''
+    
+    # Instruction-tuned prompt
+    prompt = f"<|prompt|>Human: {job_description}\nAssistant: "
+    inputs = tokenizer(prompt, return_tensors="pt").to("cpu")
+    input_ids = inputs['input_ids'][:1]  # Shape: [1, seq_length]
+    attention_mask = inputs['attention_mask'][:1]  # Shape: [1, seq_length]
+    position_ids = torch.arange(input_ids.shape[1]).unsqueeze(0).to("cpu")  # Shape: [1, seq_length]
 
-            # Generate with low token limit for speed/memory
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=120,  # Fits your memory, adjustable
-                do_sample=True,
-                temperature=0.6,  # Recommended by DeepSeek for coherence
-                top_p=0.95
-            )
-            result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    print("Input_ids shape:", input_ids.shape)
+    print("Attention_mask shape:", attention_mask.shape)
+    print("Position_ids shape:", position_ids.shape)
+    print("Input text:", tokenizer.decode(input_ids[0], skip_special_tokens=True))
+    
+    with torch.no_grad():
+        outputs = model.generate(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            max_new_tokens=100,
+            do_sample=True,
+            temperature=0.8,
+            top_p=0.95,
+            top_k=40,
+            repetition_penalty=1.2,
+            cache_implementation="sliding_window",
+            eos_token_id=None  # Prevent early stopping
+        )
+        print(f"Generated sequence shape: {outputs.shape}")
+        print(f"Generated tokens: {outputs[0].tolist()}")
+        result = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        print("Generated text:", result)
 
-            # Stream words
-            for word in result.split():
-                yield f"data: {word} \n\n"
-                time.sleep(0.05)
-        yield "data: \n\n"
-
-    if request.method == 'POST':
-        data = request.get_json()
-        job_description = data.get('job_description', '')
-        return Response(generate(job_description), mimetype='text/event-stream')
-
-    elif request.method == 'GET':
-        return Response(generate(), mimetype='text/event-stream')
+    print(f"Generation time: {time.time() - start_time:.2f} seconds")
+    print(f"RAM Used: {psutil.virtual_memory().used / 1024**3:.2f} GB")
+    return jsonify({"generated_text": result})
 
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)

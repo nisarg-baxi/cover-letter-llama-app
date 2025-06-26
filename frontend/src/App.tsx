@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 
+const AI_AVATAR = <div className="avatar ai-avatar">🤖</div>;
+const USER_AVATAR = <div className="avatar user-avatar">🧑</div>;
+
 function App() {
-  const [jobDescription, setJobDescription] = useState("");
+  const [userInput, setUserInput] = useState("");
   const [conversation, setConversation] = useState<
     { type: "user" | "ai"; text: string; isLoading?: boolean }[]
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const conversationRef = useRef<HTMLDivElement>(null);
 
-  const generateCoverLetter = async () => {
-    if (!jobDescription.trim()) return;
+  const sendMessage = async () => {
+    if (!userInput.trim()) return;
 
     setConversation((prev) => [
       ...prev,
-      { type: "user", text: jobDescription },
+      { type: "user", text: userInput },
       { type: "ai", text: "", isLoading: true },
     ]);
     setIsLoading(true);
@@ -25,7 +28,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ job_description: jobDescription }),
+        body: JSON.stringify({ job_description: userInput }),
         credentials: "include",
       });
 
@@ -75,7 +78,7 @@ function App() {
         }
       }
     } catch (error) {
-      console.error("Error generating cover letter:", error);
+      console.error("Error generating response:", error);
       setConversation((prev) =>
         prev.map((item, idx) =>
           idx === prev.length - 1 ? { ...item, isLoading: false } : item
@@ -84,13 +87,13 @@ function App() {
       setIsLoading(false);
     }
 
-    setJobDescription("");
+    setUserInput("");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      generateCoverLetter();
+      sendMessage();
     }
   };
 
@@ -101,38 +104,52 @@ function App() {
   }, [conversation]);
 
   return (
-    <div className="chat-wrapper">
+    <div className="modern-bg">
       <div className="chat-container">
         <div className="chat-header">
-          <h1>Cover Letter Generator</h1>
+          <div className="header-logo">🦙</div>
+          <h1>Llama Assistant</h1>
         </div>
         <div className="chat-messages" ref={conversationRef}>
           {conversation.length === 0 && (
             <div className="chat-empty">
-              Start by pasting a job description below!
+              Ask me anything! I can help with code, writing, ideas, and more.
             </div>
           )}
           {conversation.map((msg, index) => (
             <div
               key={index}
-              className={`chat-message ${msg.type} ${
+              className={`chat-message modern ${msg.type} ${
                 msg.isLoading ? "loading" : ""
               }`}
             >
-              <div className="message-content">{msg.text}</div>
+              {msg.type === "ai" ? AI_AVATAR : USER_AVATAR}
+              <div className="message-content">
+                {msg.text}
+                {msg.isLoading && (
+                  <span className="typing-indicator">
+                    <span className="dot" />
+                    <span className="dot" />
+                    <span className="dot" />
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>
-        <div className="chat-input">
+        <div className="chat-input modern-input">
           <textarea
-            value={jobDescription}
-            onChange={(e) => setJobDescription(e.target.value)}
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Paste job description here..."
-            rows={3}
+            placeholder="Type your message..."
+            rows={1}
             disabled={isLoading}
           />
-          <button onClick={generateCoverLetter} disabled={isLoading}>
+          <button
+            onClick={sendMessage}
+            disabled={isLoading || !userInput.trim()}
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+service LLMService {
+  rpc Forward (ForwardRequest) returns (ForwardResponse);
+  rpc HealthCheck (HealthRequest) returns (HealthResponse);
+}
+
+message ForwardRequest {
+  repeated int32 input_ids = 1;
+  repeated int32 attention_mask = 2;
+  repeated int32 position_ids = 3;
+}
+
+message ForwardResponse {
+  repeated float activations = 1;
+  string message = 2;
+}
+
+message HealthRequest {}
+message HealthResponse {
+  string status = 1;
+} 
