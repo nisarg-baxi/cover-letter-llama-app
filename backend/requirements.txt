@@ -2,3 +2,6 @@ Flask
 Flask-Cors
 transformers
 torch
+psutil
+grpcio
+grpcio-tools
