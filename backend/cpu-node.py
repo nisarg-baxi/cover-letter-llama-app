@@ -13,7 +13,7 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 
 # Use a model that doesn't require sentencepiece
-model_id = "microsoft/DialoGPT-medium"  # This uses GPT-2 tokenizer which doesn't need sentencepiece
+model_id = "google/gemma-2-9b-it"  # This uses GPT-2 tokenizer which doesn't need sentencepiece
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 # GPU node configuration
