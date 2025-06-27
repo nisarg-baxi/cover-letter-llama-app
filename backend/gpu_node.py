@@ -5,23 +5,29 @@ import grpc
 from concurrent import futures
 import llm_pb2
 import llm_pb2_grpc
+import os
+
+# Disable Triton to avoid installation issues
+os.environ["DISABLE_TRITON"] = "1"
+os.environ["TORCHDYNAMO_DISABLE"] = "1"
 
 class LLMServiceServicer(llm_pb2_grpc.LLMServiceServicer):
     def __init__(self):
-        self.model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+        self.model_id = "microsoft/DialoGPT-medium"  # Use the same model as CPU node
         print("Loading tokenizer and 4-bit quantized model on GPU node...")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
+            bnb_4bit_use_double_quant=False,  # Disable double quantization to avoid Triton
             bnb_4bit_quant_type="nf4"
         )
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_id,
             device_map="cuda:0",
             torch_dtype=torch.float16,
-            quantization_config=bnb_config
+            quantization_config=bnb_config,
+            low_cpu_mem_usage=True
         )
         print(f"Loaded full model on GPU in 4-bit mode")
         print(f"VRAM Used: {torch.cuda.memory_allocated(0) / 1024**3:.2f} GB")

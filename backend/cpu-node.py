@@ -12,17 +12,19 @@ import llm_pb2_grpc
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 
-model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+# Use a model that doesn't require sentencepiece
+model_id = "microsoft/DialoGPT-medium"  # This uses GPT-2 tokenizer which doesn't need sentencepiece
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 # GPU node configuration
-GPU_NODE_ADDRESS = "172.20.10.12:50051"  # Replace with your Wi ndows GPU node's IP and gRPC port
+GPU_NODE_ADDRESS = "10.0.0.196:50051"  # Replace with your Windows GPU node's IP and gRPC port
 
 @app.route('/generate', methods=['POST'])
 def generate_cover_letter():
     def generate(user_message=None):
         if user_message:
-            prompt = f"[INST] {user_message.strip()} [/INST]"
+            # For DialoGPT, we'll use a simpler prompt format
+            prompt = f"User: {user_message.strip()}\nAssistant:"
             inputs = tokenizer(prompt, return_tensors="pt")
             input_ids = inputs['input_ids'][0].tolist()
             attention_mask = inputs['attention_mask'][0].tolist()

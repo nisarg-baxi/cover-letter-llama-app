@@ -6,3 +6,5 @@ psutil
 grpcio
 grpcio-tools
 bitsandbytes
+sentencepiece
+tokenizers
