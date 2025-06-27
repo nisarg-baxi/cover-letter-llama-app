@@ -12,11 +12,11 @@ import llm_pb2_grpc
 app = Flask(__name__)
 CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 
-model_id = "mistralai/Mistral-7B-v0.1"
+model_id = "mistralai/Mistral-7B-Instruct-v0.3"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 # GPU node configuration
-GPU_NODE_ADDRESS = "192.168.1.100:50051"  # Replace with your Windows GPU node's IP and gRPC port
+GPU_NODE_ADDRESS = "172.20.10.12:50051"  # Replace with your Wi ndows GPU node's IP and gRPC port
 
 @app.route('/generate', methods=['POST'])
 def generate_cover_letter():

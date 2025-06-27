@@ -8,7 +8,7 @@ import llm_pb2_grpc
 
 class LLMServiceServicer(llm_pb2_grpc.LLMServiceServicer):
     def __init__(self):
-        self.model_id = "mistralai/Mistral-7B-v0.1"
+        self.model_id = "mistralai/Mistral-7B-Instruct-v0.3"
         print("Loading tokenizer and 4-bit quantized model on GPU node...")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
         bnb_config = BitsAndBytesConfig(
